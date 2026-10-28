@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -5,15 +6,47 @@ on:
   push:
     paths:
       - '.github/workflows/android.yml'
+      - '*.zip'
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Download project files
         uses: actions/checkout@v4
 
-      - name: Build APK
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
         run: |
-          echo "Checking project files"
-          unzip -l *.zip
+          wget https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q gradle-8.9-bin.zip
+
+      - name: Extract Android project
+        run: |
+          mkdir project
+          unzip -o ./*.zip -d project
+
+      - name: Build APK
+        run: ./gradle-8.9/bin/gradle -p project assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: worksites-app-apk
+          path: project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
