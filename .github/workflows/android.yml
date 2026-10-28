@@ -1,4 +1,3 @@
-
 name: Build Android APK
 
 on:
@@ -31,6 +30,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Prepare Android SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
@@ -52,7 +54,7 @@ jobs:
 
       - name: Build debug APK
         run: |
-          PROJECT_DIR=$(find project -type f -name settings.gradle -print -quit | xargs dirname)
+          PROJECT_DIR=$(find project -type f -name settings.gradle -print -quit | xargs -r dirname)
           if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
             echo "Android project files not found"
             exit 1
