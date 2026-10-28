@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Download project files
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Java
@@ -26,51 +26,38 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          cmdline-tools-version: '11076708'
+          gradle-version: '8.9'
 
-      - name: Install Android packages
+      - name: Prepare Android SDK
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | sdkmanager --licenses || true
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
-      - name: Extract project ZIP
+      - name: Extract Android project
         run: |
           mkdir -p project
-          find . -maxdepth 1 -type f -iname '*.zip' -print -quit | grep -q . || {
-            echo "ERROR: No project ZIP file found"
-            exit 1
-          }
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No ZIP file found"
+            exit 1
+          fi
           unzip -o "$ZIP_FILE" -d project
 
-      - name: Find Android project
-        id: find_project
+      - name: Build debug APK
         run: |
-          FILE=$(find project -type f \( -name gradlew -o -name settings.gradle -o -name settings.gradle.kts \) -print -quit)
-          if [ -z "$FILE" ]; then
-            echo "No Android Gradle project found in ZIP."
-            echo "A web HTML app needs to be converted to Android first."
+          PROJECT_DIR=$(find project -type f -name settings.gradle -print -quit | xargs dirname)
+          if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
+            echo "Android project files not found"
             exit 1
           fi
-          if [ "$(basename "$FILE")" = "gradlew" ]; then
-            DIR=$(dirname "$FILE")
-          else
-            DIR=$(dirname "$FILE")
-          fi
-          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
-
-      - name: Build APK
-        working-directory: .
-        run: |
-          cd "${{ steps.find_project.outputs.dir }}"
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug
-          else
-            gradle assembleDebug
-          fi
+          gradle -p "$PROJECT_DIR" assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
